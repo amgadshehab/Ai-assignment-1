@@ -89,12 +89,14 @@ public class BattleSolver {
         int sumA = st.sumHealthA();
         int sumB = st.sumHealthB();
 
-        if (sumA == 0) {         // B wins
-            return -sumB;
-        } else if (sumB == 0) {  // A wins
-            return sumA;
+        if (startingPlayer == 'A') {
+            if (sumB == 0) return sumA;      // A wins
+            else if (sumA == 0) return -sumB; // A loses
+        } else {
+            if (sumA == 0) return sumB;       // B wins
+            else if (sumB == 0) return -sumA; // B loses
         }
-        return 0; 
+        return 0;
     }
 
     // ========== ACTION & GENERATION ==========
@@ -117,7 +119,6 @@ public class BattleSolver {
     private List<Action> generateActions(State st) {
         List<Action> acts = new ArrayList<>();
         if (st.turn == 'A') {
-            // A attacks B
             for (int i = 0; i < st.healthA.length; i++) {
                 if (st.healthA[i] <= 0) continue;
                 for (int j = 0; j < st.healthB.length; j++) {
@@ -126,7 +127,6 @@ public class BattleSolver {
                 }
             }
         } else {
-            // B attacks A
             for (int i = 0; i < st.healthB.length; i++) {
                 if (st.healthB[i] <= 0) continue;
                 for (int j = 0; j < st.healthA.length; j++) {
@@ -152,13 +152,7 @@ public class BattleSolver {
         return ns;
     }
 
-
-    // ========== MINIMAX (The startingPlayer is MAX) ==========
-    private int minimax(Node node, boolean ab) {
-        if (ab) return minimaxAB(node, Integer.MIN_VALUE, Integer.MAX_VALUE);
-        else return minimaxNoAB(node);
-    }
-
+    // ========== MINIMAX (MEMORY OPTIMIZED) ==========
     private boolean isMaxTurn(State st) {
         return st.turn == startingPlayer;
     }
@@ -170,57 +164,43 @@ public class BattleSolver {
         }
 
         List<Action> actions = generateActions(node.state);
-        nodesExpanded++; 
-        node.children = new ArrayList<>();
+        nodesExpanded++;
 
-        // CRITICAL FIX: Determine the actual operation based on the Maximizer's identity
-        boolean isCurrentPlayerOverallMaximizer = isMaxTurn(node.state);
+        // DON'T store all children - only track the best one
+        Node bestChild = null;
         
-        if (isCurrentPlayerOverallMaximizer) {
-            // The current player is the overall Maximizer (startingPlayer)
-            
-            if (startingPlayer == 'A') {
-                // A is MAX. Utility is A's score. -> MAXIMIZE operation.
-                int best = Integer.MIN_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    best = Math.max(best, minimaxNoAB(child));
+        if (isMaxTurn(node.state)) {
+            int best = Integer.MIN_VALUE;
+            for (Action a : actions) {
+                Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
+                int value = minimaxNoAB(child);
+                
+                if (value > best) {
+                    best = value;
+                    bestChild = child; // Keep only the best child
                 }
-                node.value = best;
-            } else {
-                // B is MAX. Utility is A's score. B wants to MINIMIZE A's score. -> MINIMIZE operation.
-                int best = Integer.MAX_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    best = Math.min(best, minimaxNoAB(child));
-                }
-                node.value = best;
             }
+            node.value = best;
         } else {
-            // The current player is the overall Minimizer (opponent of startingPlayer)
-
-            if (startingPlayer == 'A') {
-                // B is MIN. Utility is A's score. -> MINIMIZE operation.
-                int best = Integer.MAX_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    best = Math.min(best, minimaxNoAB(child));
+            int best = Integer.MAX_VALUE;
+            for (Action a : actions) {
+                Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
+                int value = minimaxNoAB(child);
+                
+                if (value < best) {
+                    best = value;
+                    bestChild = child; // Keep only the best child
                 }
-                node.value = best;
-            } else {
-                // A is MIN. Utility is A's score. A wants to MAXIMIZE A's score (to hurt B). -> MAXIMIZE operation.
-                int best = Integer.MIN_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    best = Math.max(best, minimaxNoAB(child));
-                }
-                node.value = best;
             }
+            node.value = best;
         }
+        
+        // Store only the best child
+        if (bestChild != null) {
+            node.children = new ArrayList<>();
+            node.children.add(bestChild);
+        }
+        
         return node.value;
     }
 
@@ -231,65 +211,49 @@ public class BattleSolver {
         }
 
         List<Action> actions = generateActions(node.state);
-        nodesExpanded++; 
-        node.children = new ArrayList<>();
+        nodesExpanded++;
 
-        // CRITICAL FIX: Determine the actual operation based on the Maximizer's identity
-        boolean isCurrentPlayerOverallMaximizer = isMaxTurn(node.state);
+        // DON'T store all children - only track the best one
+        Node bestChild = null;
 
-        if (isCurrentPlayerOverallMaximizer) {
-            // The current player is the overall Maximizer (startingPlayer)
-            
-            if (startingPlayer == 'A') {
-                // A is MAX. Utility is A's score. -> MAXIMIZE operation (Standard Alpha-Beta)
-                int value = Integer.MIN_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    value = Math.max(value, minimaxAB(child, alpha, beta));
-                    alpha = Math.max(alpha, value);
-                    if (alpha >= beta) break; 
+        if (isMaxTurn(node.state)) {
+            int value = Integer.MIN_VALUE;
+            for (Action a : actions) {
+                Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
+                int childValue = minimaxAB(child, alpha, beta);
+                
+                if (childValue > value) {
+                    value = childValue;
+                    bestChild = child; // Keep only the best child
                 }
-                node.value = value;
-            } else {
-                // B is MAX. Utility is A's score. B wants to MINIMIZE A's score. -> MINIMIZE operation.
-                int value = Integer.MAX_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    value = Math.min(value, minimaxAB(child, alpha, beta));
-                    beta = Math.min(beta, value); // Pruning logic for MIN step
-                    if (alpha >= beta) break; 
-                }
-                node.value = value;
+                
+                alpha = Math.max(alpha, value);
+                if (alpha >= beta) break;
             }
+            node.value = value;
         } else {
-            // The current player is the overall Minimizer (opponent of startingPlayer)
-
-            if (startingPlayer == 'A') {
-                // B is MIN. Utility is A's score. -> MINIMIZE operation (Standard Alpha-Beta)
-                int value = Integer.MAX_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    value = Math.min(value, minimaxAB(child, alpha, beta));
-                    beta = Math.min(beta, value);
-                    if (alpha >= beta) break;
+            int value = Integer.MAX_VALUE;
+            for (Action a : actions) {
+                Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
+                int childValue = minimaxAB(child, alpha, beta);
+                
+                if (childValue < value) {
+                    value = childValue;
+                    bestChild = child; // Keep only the best child
                 }
-                node.value = value;
-            } else {
-                // A is MIN. Utility is A's score. A wants to MAXIMIZE A's score. -> MAXIMIZE operation.
-                int value = Integer.MIN_VALUE;
-                for (Action a : actions) {
-                    Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
-                    node.children.add(child);
-                    value = Math.max(value, minimaxAB(child, alpha, beta));
-                    alpha = Math.max(alpha, value); // Pruning logic for MAX step
-                    if (alpha >= beta) break;
-                }
-                node.value = value;
+                
+                beta = Math.min(beta, value);
+                if (alpha >= beta) break;
             }
+            node.value = value;
         }
+        
+        // Store only the best child
+        if (bestChild != null) {
+            node.children = new ArrayList<>();
+            node.children.add(bestChild);
+        }
+
         return node.value;
     }
 
@@ -300,19 +264,9 @@ public class BattleSolver {
 
         while (!isTerminal(cur.state)) {
             if (cur.children == null || cur.children.isEmpty()) break;
-
-            Node chosen = null;
-
-            // First child with correct value (deterministic tie-breaking)
-            for (Node ch : cur.children) {
-                if (ch.value == cur.value) {
-                    chosen = ch;
-                    break;
-                }
-            }
-
-            if (chosen == null) break;
-
+            
+            // We stored only the best child, so take it
+            Node chosen = cur.children.get(0);
             plan.add(chosen.action);
             cur = chosen;
         }
@@ -328,17 +282,73 @@ public class BattleSolver {
             Node root = new Node(init, null, null, 0);
             this.initialNode = root;
 
-            minimax(root, ab);
+            if (ab) {
+                minimaxAB(root, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            } else {
+                minimaxNoAB(root);
+            }
 
             List<String> plan = reconstructPlan(root);
 
             int finalScore = root.value;
 
+            if (visualize) {
+                visualizeSolution(init, plan, finalScore);
+            }
+
             String planStr = String.join(",", plan);
             return planStr + ";" + finalScore + ";" + nodesExpanded + ";";
 
         } catch (Exception e) {
+            e.printStackTrace();
             return ";;0;";
         }
+    }
+
+    // Optional visualization
+    private void visualizeSolution(State initial, List<String> plan, int score) {
+        System.out.println("=== Battle Solution ===");
+        System.out.println("Starting Player: " + startingPlayer);
+        System.out.println("Initial State:");
+        printState(initial);
+        
+        State current = initial.copy();
+        for (int i = 0; i < plan.size(); i++) {
+            String action = plan.get(i);
+            System.out.println("\nStep " + (i + 1) + ": " + action);
+            
+            // Parse and apply action
+            char player = action.charAt(0);
+            int openParen = action.indexOf('(');
+            int comma = action.indexOf(',');
+            int closeParen = action.indexOf(')');
+            int attacker = Integer.parseInt(action.substring(openParen + 1, comma));
+            int target = Integer.parseInt(action.substring(comma + 1, closeParen));
+            
+            Action a = new Action(player, attacker, target);
+            current = applyAction(current, a);
+            printState(current);
+        }
+        
+        System.out.println("\nFinal Score: " + score);
+        System.out.println("Nodes Expanded: " + nodesExpanded);
+        System.out.println("======================\n");
+    }
+
+    private void printState(State s) {
+        System.out.print("  A: [");
+        for (int i = 0; i < s.healthA.length; i++) {
+            if (i > 0) System.out.print(", ");
+            System.out.print(s.healthA[i] + "hp/" + s.damageA[i] + "dmg");
+        }
+        System.out.print("] Total: " + s.sumHealthA());
+        
+        System.out.print("\n  B: [");
+        for (int i = 0; i < s.healthB.length; i++) {
+            if (i > 0) System.out.print(", ");
+            System.out.print(s.healthB[i] + "hp/" + s.damageB[i] + "dmg");
+        }
+        System.out.println("] Total: " + s.sumHealthB());
+        System.out.println("  Turn: " + s.turn);
     }
 }
