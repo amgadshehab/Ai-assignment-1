@@ -3,12 +3,6 @@ package battle;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Node used by the BattleSolver search.
- *
- * Added attributes to store state/parent/action/children so the solver can
- * build and traverse the search tree. Kept original `value` and `getValue()`.
- */
 public class Node {
 
     // state for this node (populated/used by BattleSolver)

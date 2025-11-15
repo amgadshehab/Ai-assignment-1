@@ -11,7 +11,6 @@ public class BattleSolver {
     private int nodesExpanded;
     private char startingPlayer; 
 
-    // ========== STATE CLASS ==========
     public static class State {
         public int[] healthA;
         public int[] damageA;
@@ -50,7 +49,7 @@ public class BattleSolver {
         }
     }
 
-    // ========== PARSING ==========
+    
     private State parseInitialState(String s) {
         String t = s;
         if (t.endsWith(";")) t = t.substring(0, t.length() - 1);
@@ -59,7 +58,7 @@ public class BattleSolver {
         String partB = parts[1];
         startingPlayer = parts[2].charAt(0);
 
-        // parse A
+        
         String[] tokA = partA.isEmpty() ? new String[0] : partA.split(",");
         int[] hA = new int[tokA.length / 2];
         int[] dA = new int[tokA.length / 2];
@@ -68,7 +67,7 @@ public class BattleSolver {
             dA[i] = Integer.parseInt(tokA[2 * i + 1]);
         }
 
-        // parse B
+        
         String[] tokB = partB.isEmpty() ? new String[0] : partB.split(",");
         int[] hB = new int[tokB.length / 2];
         int[] dB = new int[tokB.length / 2];
@@ -80,7 +79,7 @@ public class BattleSolver {
         return new State(hA, dA, hB, dB, startingPlayer);
     }
 
-    // ========== TERMINAL & UTILITY ==========
+    
     private boolean isTerminal(State st) {
         return st.sumHealthA() == 0 || st.sumHealthB() == 0;
     }
@@ -99,7 +98,7 @@ public class BattleSolver {
         return 0;
     }
 
-    // ========== ACTION & GENERATION ==========
+    
     private static class Action {
         char player;
         int attacker;
@@ -152,7 +151,7 @@ public class BattleSolver {
         return ns;
     }
 
-    // ========== MINIMAX (MEMORY OPTIMIZED) ==========
+    
     private boolean isMaxTurn(State st) {
         return st.turn == startingPlayer;
     }
@@ -166,7 +165,7 @@ public class BattleSolver {
         List<Action> actions = generateActions(node.state);
         nodesExpanded++;
 
-        // DON'T store all children - only track the best one
+        // don't store all children only track the best one
         Node bestChild = null;
         
         if (isMaxTurn(node.state)) {
@@ -177,7 +176,7 @@ public class BattleSolver {
                 
                 if (value > best) {
                     best = value;
-                    bestChild = child; // Keep only the best child
+                    bestChild = child; 
                 }
             }
             node.value = best;
@@ -189,7 +188,7 @@ public class BattleSolver {
                 
                 if (value < best) {
                     best = value;
-                    bestChild = child; // Keep only the best child
+                    bestChild = child; 
                 }
             }
             node.value = best;
@@ -213,7 +212,7 @@ public class BattleSolver {
         List<Action> actions = generateActions(node.state);
         nodesExpanded++;
 
-        // DON'T store all children - only track the best one
+        // don't store all children only track the best one
         Node bestChild = null;
 
         if (isMaxTurn(node.state)) {
@@ -224,7 +223,7 @@ public class BattleSolver {
                 
                 if (childValue > value) {
                     value = childValue;
-                    bestChild = child; // Keep only the best child
+                    bestChild = child; 
                 }
                 
                 alpha = Math.max(alpha, value);
@@ -239,7 +238,7 @@ public class BattleSolver {
                 
                 if (childValue < value) {
                     value = childValue;
-                    bestChild = child; // Keep only the best child
+                    bestChild = child; 
                 }
                 
                 beta = Math.min(beta, value);
@@ -257,7 +256,7 @@ public class BattleSolver {
         return node.value;
     }
 
-    // ========== PLAN RECONSTRUCTION ==========
+   
     private List<String> reconstructPlan(Node root) {
         List<String> plan = new ArrayList<>();
         Node cur = root;
@@ -273,7 +272,7 @@ public class BattleSolver {
         return plan;
     }
 
-    // ========== SOLVE ==========
+    
     public String solve(String initialStateString, boolean ab, boolean visualize) {
         try {
             nodesExpanded = 0;
@@ -290,11 +289,7 @@ public class BattleSolver {
 
             List<String> plan = reconstructPlan(root);
 
-            int finalScore = root.value;
-
-            if (visualize) {
-                visualizeSolution(init, plan, finalScore);
-            }
+            int finalScore = root.value; 
 
             String planStr = String.join(",", plan);
             return planStr + ";" + finalScore + ";" + nodesExpanded + ";";
@@ -305,50 +300,5 @@ public class BattleSolver {
         }
     }
 
-    // Optional visualization
-    private void visualizeSolution(State initial, List<String> plan, int score) {
-        System.out.println("=== Battle Solution ===");
-        System.out.println("Starting Player: " + startingPlayer);
-        System.out.println("Initial State:");
-        printState(initial);
-        
-        State current = initial.copy();
-        for (int i = 0; i < plan.size(); i++) {
-            String action = plan.get(i);
-            System.out.println("\nStep " + (i + 1) + ": " + action);
-            
-            // Parse and apply action
-            char player = action.charAt(0);
-            int openParen = action.indexOf('(');
-            int comma = action.indexOf(',');
-            int closeParen = action.indexOf(')');
-            int attacker = Integer.parseInt(action.substring(openParen + 1, comma));
-            int target = Integer.parseInt(action.substring(comma + 1, closeParen));
-            
-            Action a = new Action(player, attacker, target);
-            current = applyAction(current, a);
-            printState(current);
-        }
-        
-        System.out.println("\nFinal Score: " + score);
-        System.out.println("Nodes Expanded: " + nodesExpanded);
-        System.out.println("======================\n");
-    }
-
-    private void printState(State s) {
-        System.out.print("  A: [");
-        for (int i = 0; i < s.healthA.length; i++) {
-            if (i > 0) System.out.print(", ");
-            System.out.print(s.healthA[i] + "hp/" + s.damageA[i] + "dmg");
-        }
-        System.out.print("] Total: " + s.sumHealthA());
-        
-        System.out.print("\n  B: [");
-        for (int i = 0; i < s.healthB.length; i++) {
-            if (i > 0) System.out.print(", ");
-            System.out.print(s.healthB[i] + "hp/" + s.damageB[i] + "dmg");
-        }
-        System.out.println("] Total: " + s.sumHealthB());
-        System.out.println("  Turn: " + s.turn);
-    }
+    
 }
