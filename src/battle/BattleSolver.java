@@ -7,7 +7,6 @@ import java.util.List;
 public class BattleSolver {
 
     public Node initialNode; 
-
     private int nodesExpanded;
     private char startingPlayer; 
 
@@ -75,11 +74,9 @@ public class BattleSolver {
             hB[i] = Integer.parseInt(tokB[2 * i]);
             dB[i] = Integer.parseInt(tokB[2 * i + 1]);
         }
-
         return new State(hA, dA, hB, dB, startingPlayer);
     }
 
-    
     private boolean isTerminal(State st) {
         return st.sumHealthA() == 0 || st.sumHealthB() == 0;
     }
@@ -89,11 +86,11 @@ public class BattleSolver {
         int sumB = st.sumHealthB();
 
         if (startingPlayer == 'A') {
-            if (sumB == 0) return sumA;      // A wins
-            else if (sumA == 0) return -sumB; // A loses
+            if (sumB == 0) return sumA;         // A wins
+            else if (sumA == 0) return -sumB;   // A loses
         } else {
-            if (sumA == 0) return sumB;       // B wins
-            else if (sumB == 0) return -sumA; // B loses
+            if (sumA == 0) return sumB;         // B wins
+            else if (sumB == 0) return -sumA;   // B loses
         }
         return 0;
     }
