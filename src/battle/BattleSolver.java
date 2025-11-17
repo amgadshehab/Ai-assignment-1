@@ -48,17 +48,22 @@ public class BattleSolver {
         }
     }
 
-    
     private State parseInitialState(String s) {
         String t = s;
         if (t.endsWith(";")) t = t.substring(0, t.length() - 1);
         String[] parts = t.split(";");
+        
+        // Handle edge case: missing parts
+        if (parts.length < 3) {
+            throw new IllegalArgumentException("Invalid initial state format");
+        }
+        
         String partA = parts[0];
         String partB = parts[1];
         startingPlayer = parts[2].charAt(0);
 
-        
-        String[] tokA = partA.isEmpty() ? new String[0] : partA.split(",");
+        // Parse A - handle empty army
+        String[] tokA = (partA == null || partA.isEmpty()) ? new String[0] : partA.split(",");
         int[] hA = new int[tokA.length / 2];
         int[] dA = new int[tokA.length / 2];
         for (int i = 0; i < hA.length; i++) {
@@ -66,14 +71,15 @@ public class BattleSolver {
             dA[i] = Integer.parseInt(tokA[2 * i + 1]);
         }
 
-        
-        String[] tokB = partB.isEmpty() ? new String[0] : partB.split(",");
+        // Parse B - handle empty army
+        String[] tokB = (partB == null || partB.isEmpty()) ? new String[0] : partB.split(",");
         int[] hB = new int[tokB.length / 2];
         int[] dB = new int[tokB.length / 2];
         for (int i = 0; i < hB.length; i++) {
             hB[i] = Integer.parseInt(tokB[2 * i]);
             dB[i] = Integer.parseInt(tokB[2 * i + 1]);
         }
+        
         return new State(hA, dA, hB, dB, startingPlayer);
     }
 
@@ -86,16 +92,25 @@ public class BattleSolver {
         int sumB = st.sumHealthB();
 
         if (startingPlayer == 'A') {
-            if (sumB == 0) return sumA;         // A wins
-            else if (sumA == 0) return -sumB;   // A loses
+            if (sumB == 0) {
+                // A wins
+                return sumA;
+            } else if (sumA == 0) {
+                // A loses
+                return -sumB;
+            }
         } else {
-            if (sumA == 0) return sumB;         // B wins
-            else if (sumB == 0) return -sumA;   // B loses
+            if (sumA == 0) {
+                // B wins
+                return sumB;
+            } else if (sumB == 0) {
+                // B loses
+                return -sumA;
+            }
         }
-        return 0;
+        return 0; // Non-terminal state (shouldn't happen in terminal check)
     }
 
-    
     private static class Action {
         char player;
         int attacker;
@@ -115,6 +130,7 @@ public class BattleSolver {
     private List<Action> generateActions(State st) {
         List<Action> acts = new ArrayList<>();
         if (st.turn == 'A') {
+            // A attacks B
             for (int i = 0; i < st.healthA.length; i++) {
                 if (st.healthA[i] <= 0) continue;
                 for (int j = 0; j < st.healthB.length; j++) {
@@ -123,6 +139,7 @@ public class BattleSolver {
                 }
             }
         } else {
+            // B attacks A
             for (int i = 0; i < st.healthB.length; i++) {
                 if (st.healthB[i] <= 0) continue;
                 for (int j = 0; j < st.healthA.length; j++) {
@@ -148,7 +165,6 @@ public class BattleSolver {
         return ns;
     }
 
-    
     private boolean isMaxTurn(State st) {
         return st.turn == startingPlayer;
     }
@@ -162,7 +178,12 @@ public class BattleSolver {
         List<Action> actions = generateActions(node.state);
         nodesExpanded++;
 
-        // don't store all children only track the best one
+        // Edge case: No valid actions (shouldn't happen if terminal check is correct)
+        if (actions.isEmpty()) {
+            node.value = utility(node.state);
+            return node.value;
+        }
+
         Node bestChild = null;
         
         if (isMaxTurn(node.state)) {
@@ -171,9 +192,10 @@ public class BattleSolver {
                 Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
                 int value = minimaxNoAB(child);
                 
+                // Use > for first improvement (deterministic tie-breaking)
                 if (value > best) {
                     best = value;
-                    bestChild = child; 
+                    bestChild = child;
                 }
             }
             node.value = best;
@@ -183,9 +205,10 @@ public class BattleSolver {
                 Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
                 int value = minimaxNoAB(child);
                 
+                // Use < for first improvement (deterministic tie-breaking)
                 if (value < best) {
                     best = value;
-                    bestChild = child; 
+                    bestChild = child;
                 }
             }
             node.value = best;
@@ -209,7 +232,12 @@ public class BattleSolver {
         List<Action> actions = generateActions(node.state);
         nodesExpanded++;
 
-        // don't store all children only track the best one
+        // Edge case: No valid actions
+        if (actions.isEmpty()) {
+            node.value = utility(node.state);
+            return node.value;
+        }
+
         Node bestChild = null;
 
         if (isMaxTurn(node.state)) {
@@ -218,13 +246,16 @@ public class BattleSolver {
                 Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
                 int childValue = minimaxAB(child, alpha, beta);
                 
+                // Update best child on improvement
                 if (childValue > value) {
                     value = childValue;
-                    bestChild = child; 
+                    bestChild = child;
                 }
                 
                 alpha = Math.max(alpha, value);
-                if (alpha >= beta) break;
+                if (alpha >= beta) {
+                    break; // Beta cutoff
+                }
             }
             node.value = value;
         } else {
@@ -233,13 +264,16 @@ public class BattleSolver {
                 Node child = new Node(applyAction(node.state, a), node, a.toString(), node.depth + 1);
                 int childValue = minimaxAB(child, alpha, beta);
                 
+                // Update best child on improvement
                 if (childValue < value) {
                     value = childValue;
-                    bestChild = child; 
+                    bestChild = child;
                 }
                 
                 beta = Math.min(beta, value);
-                if (alpha >= beta) break;
+                if (alpha >= beta) {
+                    break; // Alpha cutoff
+                }
             }
             node.value = value;
         }
@@ -253,28 +287,38 @@ public class BattleSolver {
         return node.value;
     }
 
-   
     private List<String> reconstructPlan(Node root) {
         List<String> plan = new ArrayList<>();
         Node cur = root;
 
         while (!isTerminal(cur.state)) {
-            if (cur.children == null || cur.children.isEmpty()) break;
+            if (cur.children == null || cur.children.isEmpty()) {
+                break;
+            }
             
-            // We stored only the best child, so take it
             Node chosen = cur.children.get(0);
-            plan.add(chosen.action);
+            if (chosen.action != null) {
+                plan.add(chosen.action);
+            }
             cur = chosen;
         }
         return plan;
     }
 
-    
     public String solve(String initialStateString, boolean ab, boolean visualize) {
         try {
             nodesExpanded = 0;
 
             State init = parseInitialState(initialStateString);
+            
+            // Edge case: Game already over
+            if (isTerminal(init)) {
+                Node root = new Node(init, null, null, 0);
+                root.value = utility(init);
+                this.initialNode = root;
+                return ";" + root.value + ";0;";
+            }
+            
             Node root = new Node(init, null, null, 0);
             this.initialNode = root;
 
@@ -285,10 +329,9 @@ public class BattleSolver {
             }
 
             List<String> plan = reconstructPlan(root);
+            int finalScore = root.value;
 
-            int finalScore = root.value; 
-
-            String planStr = String.join(",", plan);
+            String planStr = plan.isEmpty() ? "" : String.join(",", plan);
             return planStr + ";" + finalScore + ";" + nodesExpanded + ";";
 
         } catch (Exception e) {
@@ -296,6 +339,4 @@ public class BattleSolver {
             return ";;0;";
         }
     }
-
-    
 }
